@@ -28,7 +28,7 @@ import argparse
 parser = argparse.ArgumentParser(description='get_calibtated_cam_output')
 parser.add_argument(
     '--scene', required=True, type=str, default="",
-    help="for which scene: RealScene01, RealScene02",
+    help="for which scene: RealScene01, RealScene02, SimScene01, SimScene02, SimScene03, RealScene02_extra",
 )
 parser.add_argument('--defocus_type', required=True, type=str, default="", help="which defocus type to run: gaussian or uniform")
 
@@ -43,8 +43,15 @@ defocus_type = args.defocus_type
 #### Paths ####
 phys_cam_model_path = "../models/cam_model.py"
 phys_cam_model_params_path = f"../../CameraCalibrateExp/phys_cam_model_params_defocus_{defocus_type}.json"
-depth_map_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/{scene}/depth_maps_wo_ground/"
-dst_defocus_matrix_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/{scene}/defocus_matrices_{defocus_type}_wo_ground/"
+if (scene in ["RealScene02", "RealScene02_extra"]):
+    depth_map_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/RealScene02/depth_maps_wo_ground/"
+else:
+    depth_map_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/{scene}/depth_maps_wo_ground/"
+
+if (scene in ["RealScene02", "RealScene02_extra"]):
+    dst_defocus_matrix_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/RealScene02/defocus_matrices_{defocus_type}_wo_ground/"        
+else:
+    dst_defocus_matrix_dir = f"../../DiffPhysCam_Data/NovelViewSynthesis_Data/{scene}/defocus_matrices_{defocus_type}_wo_ground/"
 
 ### Customized camera model parameters for inverse rendering ###
 max_CoC = 15
@@ -52,14 +59,25 @@ max_CoC = 15
 if (scene == "RealScene01"):
     focal_length = 0.00572951691782118 # [m]
     hFOV = 1.1278099154119037 # [rad]
+    remove_defocus_bound = True
 
 elif (scene == "RealScene02"):
     focal_length = 0.0057094403074227179 # [m]
     hFOV = 1.1556226234962288 # [rad]
+    remove_defocus_bound = True
+
+elif (scene == "RealScene02_extra"):
+    focal_length = 0.0057094403074227179 # [m]
+    hFOV = 1.1556226234962288 # [rad]
+    defocus_bias = 0.25 # [m]
+    remove_defocus_bound = False
 
 elif ("SimScene" in scene):
     focal_length = 0.005 # [m]
     hFOV = 55.7 * pi / 180.0 # [rad]
+    remove_defocus_bound = True
+
+
 
 #### General parameters ####
 img_w = 1024 # [px]
@@ -168,6 +186,37 @@ elif (scene == "RealScene02"):
         # {"SuperFar": 3.30, "SuperNear": 0.3}, # RealScene02, sun_No
     ]
 
+elif (scene == "RealScene02_extra"):
+    defocus_name_suffix_dict = {
+        "wo_ground": "_VGGT_NoGround",
+    }
+    
+    #### Scene and camera setting parameters ####
+    sun_azis = [ # [deg]
+        "No",
+    ]
+
+    polar_angles = [ # [deg]
+        85,
+    ]
+    num_polar_angles = len(polar_angles)
+
+    num_azi_angles_list = [
+        36,
+    ]
+
+    start_azi_angle_dict = { # [deg]
+        "No": 0,
+    }
+
+    aperture_nums = [
+        2.0
+    ]
+
+    focus_dist_dicts = [ # [m]
+        {"SuperFar": 3.30, "SuperNear": 0.3}, # RealScene02, sun_No
+    ]
+
 elif ("SimScene" in scene):
 
     #### Scene and camera setting parameters ####
@@ -238,6 +287,8 @@ noise_params["STD_reads"] = noise_amp * np.array(noise_params["STD_reads"], dtyp
 
 gain_params = cam_params["gain_params"]
 gain_params["max_CoC"] = max_CoC
+if "defocus_bias" in globals():
+    gain_params["defocus_bias"] = defocus_bias
 
 ## Lens parameters (Arducam LN042 5mm lens)
 # focal_length = cam_params["focal_length"] # [m]
@@ -300,6 +351,7 @@ for sun_azi in sun_azis:
                         "focus_dist": focus_dist,
                     },
                     kernel_type=defocus_type,
+                    remove_bound=remove_defocus_bound,
                 )
                 defocus_matrix = defocus_matrix.detach().cpu()
                 defocus_D_map = defocus_D_map.astype(float) / gain_params["max_CoC"]

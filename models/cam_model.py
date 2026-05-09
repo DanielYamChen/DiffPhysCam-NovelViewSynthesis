@@ -360,7 +360,7 @@ class PhysDiffCamera(nn.Module):
         self.vignet_mask.requires_grad = False
 
     
-    def GetSparseTensor(self, depth_map: np.ndarray, camera_config: dict, kernel_type: str) -> tuple[torch.sparse.FloatTensor, np.ndarray]:
+    def GetSparseTensor(self, depth_map: np.ndarray, camera_config: dict, kernel_type: str, remove_bound: bool = True) -> tuple[torch.sparse.FloatTensor, np.ndarray]:
         """
         Build defocus-blur layer based on the depth map: part 1
 
@@ -371,6 +371,12 @@ class PhysDiffCamera(nn.Module):
         
         camera_config : dict
             {"aperture_num", "expsr_time", "ISO", "focal_length", "focus_dist"}, type=Dict
+
+        kernel_type : str
+            type of kernel to use for defocus-blur, "gaussian" or "uniform"
+        
+        remove_bound : bool
+            whether to remove singularity values at boundaries
 
         Returns
         -------
@@ -401,14 +407,18 @@ class PhysDiffCamera(nn.Module):
         valid_px = (depth_flatten > 1e-2)
         kernel_size_flatten[valid_px] = f * f * torch.abs(depth_flatten[valid_px] - U) / (N * C * depth_flatten[valid_px] * (U - f))
         
+        defocus_px = (kernel_size_flatten > 0.) # those pixels which are out-of-focus
+        dead_zone_px = ((1 < kernel_size_flatten) & (torch.abs(depth_flatten - U) <= b)) # those pixels within transition range
+        kernel_size_flatten[defocus_px] = a * kernel_size_flatten[defocus_px]
+        
         del depth_flatten
         torch.cuda.empty_cache()
 
-        defocus_px = (kernel_size_flatten > b) # those pixels which are out-of-focus
-        trans_px = ((1 < kernel_size_flatten) & (kernel_size_flatten <= b)) # those pixels within transition range
-        kernel_size_flatten[defocus_px] = a * kernel_size_flatten[defocus_px]
-        # kernel_size_flatten[trans_px] = (a * b - 1)/(b - 1) * kernel_size_flatten[trans_px] - b * (a - 1)/(b - 1)
-        kernel_size_flatten[trans_px] = 1.0
+        ## Maintain kernel size of pixels within the dead zone to 1
+        if (b > 1e-8):
+            # kernel_size_flatten[trans_px] = (a * b - 1)/(b - 1) * kernel_size_flatten[trans_px] - b * (a - 1)/(b - 1)
+            kernel_size_flatten[dead_zone_px] = 1.0
+
         kernel_size_flatten = torch.ceil(kernel_size_flatten).int()
 
         # ensure all kernel-sizes are odd
@@ -416,7 +426,8 @@ class PhysDiffCamera(nn.Module):
         kernel_size_flatten = torch.clip(kernel_size_flatten, 1, self.gain_params['max_CoC'])
         
         ## Remove singularity values at boundaries
-        kernel_size_flatten[kernel_size_flatten >= self.gain_params['max_CoC'] - 2] = 1
+        if (remove_bound):
+            kernel_size_flatten[kernel_size_flatten >= self.gain_params['max_CoC'] - 2] = 1
 
         # print(f"take {np.round(1000 * (time.time() - t_start), 4)} ms to convert depth map to kernel-size map")
         
