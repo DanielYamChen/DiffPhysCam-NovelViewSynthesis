@@ -65,12 +65,13 @@ Please download the folder named `DiffPhysCam_Data` of the dataset and the outpu
    ├─ NovelViewSynthesis_Data/
    └─ NovelViewSynthesis_Output/
 ```
+All the source data files and output results will be saved under `DiffPhysCam_Data`.
 
 ---
 
 ## 📦 Required Packages
 
-* Firstly, you need to clone the other repo of this paper ([DiffPhysCam-CamCaliExp](https://github.com/DanielYamChen/DiffPhysCam-CamCaliExp)) as shown above, which contains the calibrated camera model parameters defined in `DiffPhysCam-CamCaliExp/phys_cam_model_params_defocus_{gaussian,uniform}.json`.
+Firstly, you need to clone the other repo of this paper ([DiffPhysCam-CamCaliExp](https://github.com/DanielYamChen/DiffPhysCam-CamCaliExp)) as shown above, which contains the calibrated camera model parameters defined in `DiffPhysCam-CamCaliExp/phys_cam_model_params_defocus_{gaussian,uniform}.json`.
 
 This project was tested using Anaconda3. Crucial packages and their versions to install are listed below.
 
@@ -85,31 +86,38 @@ This project was tested using Anaconda3. Crucial packages and their versions to 
 
 Please refer the GitHub repo of [NVDiffRecMC](https://github.com/nvlabs/nvdiffrecmc) to see how to install the packages above.
 
+The package list printed by `conda list` is also provided in [anaconda_list.txt](anaconda_list.txt) for reference.
+
 ---
 
 ## ▶️ Run
 
 ### (Optional) Generate synthetic photos of Sim Scenes 1, 2, and 3
+With the radiances in `NovelViewSynthesis_Data/SimScene{01,02,03}/radiances_wo_ground/` generated from Chrono::Sensor and associated depth maps in `NovelViewSynthesis_Data/SimScene{01,02,03}/depth_maps_wo_ground/`, you can generate the synthetic photos of Sim Scenes 1, 2, and 3 with various camera setting parameters, which will be used for training and testing 3D scene reconstruction later. These simulated photos have also been provided in `NovelViewSynthesis_Data/SimScene{01,02,03}/imgs_wo_ground/` already.
 
+Go to `DiffPhysCam-CamCaliExp/Src/` and run
 ```bash
 python get_calibtated_cam_output.py --cond {SimScene01, SimScene02, SimScene03} --defocus_type gaussian
 ```
-The synthetic photos of Sim Scenes 1, 2, and 3 will be saved in ``
+The synthetic photos of Sim Scenes 1, 2, and 3 will be saved in `NovelViewSynthesis_Data/SimScene{01,02,03}/imgs_wo_ground/`
 
 ---
 
-Given camera configuration data `trnsfrms_and_configs_{train,test}_wo_ground.json` (which contains corresponding calibrated camera poses, camera setting parameters, defocus matrix name, and environment map name), training photos, depth maps, and environment maps, one can follow the steps below for 3D scene reconstruction and novel view synthesis.
+Given camera configuration data `trnsfrms_and_configs_{train,test}_wo_ground.json` (which contains the calibrated camera poses, camera setting parameters, defocus matrix name, and environment map name) and the training data in `NovelViewSynthesis_Data/{Sim,Real}Scene{01,02,03}/`, where the training data include training photos in `imgs_wo_ground/`, depth maps in `depth_maps_wo_ground/`, and environment maps in `envmaps`, you can go through the following steps for 3D scene reconstruction and novel view synthesis.
 
 
-### Generate and save defocus matrices from depth maps for real-world scenes
-Go to `Src/` folder and run
+### Generate and save defocus matrices from depth maps for simulated and real-world scenes
+Go to `DiffPhysCam-NovelViewSynthesis/Src/` folder and run
+
 ```bash
-python get_defocus_matrix_from_depth_map.py --scene {RealScene01, RealScene02} --defocus_type {gaussian, uniform}
+python get_defocus_matrix_from_depth_map.py --scene {SimScene01, SimScene02, SimScene03, RealScene01, RealScene02, RealScene02_extra} --defocus_type {gaussian, uniform}
 ```
-The output defocus matrices will be saved in ``.
+The output defocus matrices will be saved in `NovelViewSynthesis_Data/{Sim,Real}Scene{01,02,03}/defocus_matrices_{gaussian,uniform}_wo_ground/`.
 
 
 ### Optimize the mesh and material textures
+Go to `DiffPhysCam-NovelViewSynthesis/` and run the following commands
+
 ```bash
 # full camera condtion
 python train.py --scene SimScene01 --mesh_scale 1.8 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene01_full --add_phys_cam --defocus_type gaussian --cond full --learning_rate 0.0250 0.0030
@@ -123,7 +131,7 @@ python train.py --scene SimScene01 --mesh_scale 1.8 --out_dir ../DiffPhysCam_Dat
 # NVDiffRecMC-only (w/o camera) condition
 python train.py --scene SimScene01 --mesh_scale 1.8 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene01_wo_camera --learning_rate 0.0250 0.0030
 ```
-For SimScene01, the optimization results will be saved in `DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene01_{full,wo_defocus,wo_expsr,wo_camera}`.
+For SimScene01, the optimization results will be saved in `NovelViewSynthesis_Output/SimScene01_{full,wo_defocus,wo_expsr,wo_camera}`. The optimized object mesh and material textures (albedo, roughness, metallic, and normals) will be saved in the `mesh/` subfolder, and the synthetic testing images will be saved in the `validate/` subfolder.
 
 
 ```bash
@@ -139,7 +147,7 @@ python train.py --scene SimScene02 --mesh_scale 1.8 --out_dir ../DiffPhysCam_Dat
 # NVDiffRecMC-only (w/o camera) condition
 python train.py --scene SimScene02 --mesh_scale 1.8 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene02_wo_camera --learning_rate 0.0250 0.0030
 ```
-For SimScene02, the optimization results will be saved in `DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene02_{full,wo_defocus,wo_expsr,wo_camera}`.
+For SimScene02, the optimization results will be saved in `NovelViewSynthesis_Output/SimScene02_{full,wo_defocus,wo_expsr,wo_camera}`. The optimized object mesh and material textures (albedo, roughness, metallic, and normals) will be saved in the `mesh/` subfolder, and the synthetic testing images will be saved in the `validate/` subfolder.
 
 
 ```bash
@@ -155,7 +163,7 @@ python train.py --scene SimScene03 --mesh_scale 1.6 --out_dir ../DiffPhysCam_Dat
 # NVDiffRecMC-only (w/o camera) condition
 python train.py --scene SimScene03 --mesh_scale 1.6 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene03_wo_camera --learning_rate 0.0250 0.0030
 ```
-For SimScene03, the optimization results will be saved in `DiffPhysCam_Data/NovelViewSynthesis_Output/SimScene03_{full,wo_defocus,wo_expsr,wo_camera}`.
+For SimScene03, the optimization results will be saved in `NovelViewSynthesis_Output/SimScene03_{full,wo_defocus,wo_expsr,wo_camera}`. The optimized object mesh and material textures (albedo, roughness, metallic, and normals) will be saved in the `mesh/` subfolder, and the synthetic testing images will be saved in the `validate/` subfolder.
 
 
 ```bash
@@ -177,7 +185,7 @@ python train.py --scene RealScene01 --mesh_scale 1.4 --out_dir ../DiffPhysCam_Da
 # NVDiffRecMC-only (w/o camera) condition
 python train.py --scene RealScene01 --mesh_scale 1.4 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene01_wo_camera --learning_rate 0.0250 0.0030
 ```
-For RealScene01, the optimization results will be saved in `DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene01_{full_defocus_gaussian,full_defocus_uniform,wo_defocus,wo_expsr_defocus_gaussian,wo_expsr_defocus_uniform,wo_camera}`.
+For RealScene01, the optimization results will be saved in `NovelViewSynthesis_Output/RealScene01_{full_defocus_gaussian,full_defocus_uniform,wo_defocus,wo_expsr_defocus_gaussian,wo_expsr_defocus_uniform,wo_camera}`. The optimized object mesh and material textures (albedo, roughness, metallic, and normals) will be saved in the `mesh/` subfolder, and the synthetic testing images will be saved in the `validate/` subfolder.
 
 
 ```bash
@@ -199,10 +207,51 @@ python train.py --scene RealScene02 --mesh_scale 3.8 --out_dir ../DiffPhysCam_Da
 # NVDiffRecMC-only (w/o camera) condition
 python train.py --scene RealScene02 --mesh_scale 3.8 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_camera --learning_rate 0.0150 0.0018
 ```
-For RealScene02, the optimization results will be saved in `DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_{full_defocus_gaussian,full_defocus_uniform,wo_defocus,wo_expsr_defocus_gaussian,wo_expsr_defocus_uniform,wo_camera}`.
+For RealScene02, the optimization results will be saved in `NovelViewSynthesis_Output/RealScene02_{full_defocus_gaussian,full_defocus_uniform,wo_defocus,wo_expsr_defocus_gaussian,wo_expsr_defocus_uniform,wo_camera}`. The optimized object mesh and material textures (albedo, roughness, metallic, and normals) will be saved in the `mesh/` subfolder, and the synthetic testing images will be saved in the `validate/` subfolder.
+
+
+### Quantitative evaluation on testing data: mean squared error(MSE), PSNR, SSIM, LPIPS
+To get the quantitative evaluation scores on the testing data, go to `DiffPhysCam-NovelViewSynthesis/Src/` and run
+```bash
+# Simulated scenes
+python calc_metrics.py --scene {SimScene01, SimScene02, SimScene03} --cond {full, wo_defocus, wo_expsr, wo_camera}
+
+# Real-world scenes
+python calc_metrics.py --scene {RealScene01, RealScene02} --cond full --defocus_type {gaussian, uniform}
+python calc_metrics.py --scene {RealScene01, RealScene02} --cond wo_defocus
+python calc_metrics.py --scene {RealScene01, RealScene02} --cond wo_expsr --defocus_type {gaussian, uniform}
+python calc_metrics.py --scene {RealScene01, RealScene02} --cond wo_camera
+```
+These results are reported in Tables III, IV, and V in the paper.
+
+
+### (Extra) Synthesize images with obvious defocus-blur effect in RealScene02
+To synthesize extra images with obvious defocus-blur effect of RealScene02 (as two examples is shown in Fig. 18(b)) based on the optimized mesh and material textures, go to `DiffPhysCam-NovelViewSynthesis/` and run the following commands
+```bash
+# full camera with Gaussian-defocused condtion
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_full_defocus_gaussian/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_full_defocus_gaussian/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json --add_phys_cam --cond full --defocus_type gaussian
+
+# full camera with Uniform-defocused condtion
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_full_defocus_uniform/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_full_defocus_uniform/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json --add_phys_cam --cond full --defocus_type uniform
+
+# w/o defocus-blur condition
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_defocus/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_defocus/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json --add_phys_cam --cond wo_defocus
+
+# w/o exposure-related with Gaussian-defocused condition
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_expsr_defocus_gaussian/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_expsr_defocus_gaussian/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json --add_phys_cam --cond wo_expsr --defocus_type gaussian
+
+# w/o exposure-related with Uniform-defocused condition
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_expsr_defocus_uniform/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_expsr_defocus_uniform/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json --add_phys_cam --cond wo_expsr --defocus_type uniform
+
+# NVDiffRecMC-only (w/o camera) condition
+python test.py --scene RealScene02 --out_dir ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_camera/extra_validate --base_mesh ../DiffPhysCam_Data/NovelViewSynthesis_Output/RealScene02_wo_camera/mesh/mesh.obj --test_set_name trnsfrms_and_configs_extra.json
+
+```
 
 ---
 
 ## 💬 Questions?
 
 Please raise issues here if you have any questions.
+
+Or contact through email: bchen293 at wisc dot edu.

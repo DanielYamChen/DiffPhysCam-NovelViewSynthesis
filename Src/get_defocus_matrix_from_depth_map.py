@@ -28,9 +28,12 @@ import argparse
 parser = argparse.ArgumentParser(description='get_calibtated_cam_output')
 parser.add_argument(
     '--scene', required=True, type=str, default="",
+    choices=["RealScene01", "RealScene02", "SimScene01", "SimScene02", "SimScene03", "RealScene02_extra"],
     help="for which scene: RealScene01, RealScene02, SimScene01, SimScene02, SimScene03, RealScene02_extra",
 )
-parser.add_argument('--defocus_type', required=True, type=str, default="", help="which defocus type to run: gaussian or uniform")
+parser.add_argument('--defocus_type', required=True, type=str, default="",
+    choices=["gaussian", "uniform"], help="which defocus type to run: gaussian or uniform"
+)
 
 args = parser.parse_args()
 scene = args.scene
@@ -335,12 +338,14 @@ for sun_azi in sun_azis:
                     depth_map_name = f"depth_polar_{polar_angle:03d}_azi_{azi_angle:03d}.exr"
 
                 depth_map = cv2.imread(os.path.join(depth_map_dir, depth_map_name), cv2.IMREAD_UNCHANGED)
+                
                 if depth_map is None:
                     print(f"Skipped reading {os.path.join(depth_map_dir, depth_map_name)}")
                     continue
                 
                 assert (depth_map.shape[0] == defocus_map_h and depth_map.shape[1] == defocus_map_w)
-                
+                # eroded_mask, boundary_band = erode_depth_mask(depth_map, erosion_size=5, iterations=3)
+                # depth_map[eroded_mask == 0] = 0. # set depth to 0 for pixels in the boundary band (to avoid noisy depth values near object boundaries)
                 defocus_matrix, defocus_D_map = phys_cam.GetSparseTensor(
                     depth_map,
                     {
