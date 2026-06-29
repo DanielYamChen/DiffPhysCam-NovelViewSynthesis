@@ -78,8 +78,6 @@ This project was tested using Anaconda3. Crucial packages and their versions to 
 * A system-wide CUDA 12.3 installed in `/usr/local/cuda-12.3`
 * Python 3.10
 * pytorch 2.10.0 (compiled with CUDA 12.8)
-* torchvision 0.25.0
-* pytorch-cuda 12.1
 * **nvdiffrast** 0.4.0
 * **tinycudann** 2.0
 * **numba** 0.64.0 (Notice: this is NOT `numba-cuda` from NVIDIA)
